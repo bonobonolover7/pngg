@@ -1,100 +1,105 @@
-from serpapi import GoogleSearch
 import requests
-
-SERP_API_KEY = "여기에_본인_SERPAPI_KEY"
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0"
-}
+from duckduckgo_search import DDGS
 
 
-def is_png(url):
+def check_png(url):
     """
-    URL이 실제 PNG인지 확인
+    이미지 URL이 실제 PNG인지 확인
     """
     try:
-        r = requests.head(
+        response = requests.head(
             url,
+            timeout=5,
             allow_redirects=True,
-            headers=HEADERS,
-            timeout=5
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
         )
 
-        content = r.headers.get("Content-Type", "").lower()
+        content_type = response.headers.get(
+            "Content-Type",
+            ""
+        ).lower()
 
-        return "image/png" in content
+        return "image/png" in content_type
 
     except Exception:
         return False
 
 
-def download_image(url):
+def search_png(keyword, max_results=30):
     """
-    이미지 다운로드
+    DuckDuckGo 이미지 검색 후 PNG만 반환
     """
+
+    results = []
+
+    checked_urls = set()
+
+
     try:
-        r = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=10
+
+        with DDGS() as ddgs:
+
+            images = ddgs.images(
+                keywords=keyword,
+                max_results=max_results * 3
+            )
+
+
+            for img in images:
+
+                image_url = img.get("image")
+
+                if not image_url:
+                    continue
+
+
+                # 중복 제거
+                if image_url in checked_urls:
+                    continue
+
+                checked_urls.add(image_url)
+
+
+                # PNG 검사
+                if check_png(image_url):
+
+                    results.append({
+
+                        "title": img.get(
+                            "title",
+                            "No title"
+                        ),
+
+                        "image": image_url,
+
+                        "thumbnail": img.get(
+                            "thumbnail"
+                        ),
+
+                        "source": img.get(
+                            "source"
+                        ),
+
+                        "page": img.get(
+                            "url"
+                        )
+
+                    })
+
+
+                # 원하는 개수 도달
+                if len(results) >= max_results:
+                    break
+
+
+    except Exception as e:
+
+        print(
+            "Search Error:",
+            e
         )
 
-        if r.status_code == 200:
-            return r.content
 
-    except Exception:
-        pass
-
-    return None
-
-
-def search_png(keyword, count=20):
-    """
-    구글 이미지 검색 후
-    PNG만 반환
-    """
-
-    params = {
-        "engine": "google_images",
-        "q": keyword,
-        "ijn": "0",
-        "api_key": SERP_API_KEY,
-        "safe": "active"
-    }
-
-    search = GoogleSearch(params)
-
-    results = search.get_dict()
-
-    images = []
-
-    if "images_results" not in results:
-        return images
-
-    for img in results["images_results"]:
-
-        url = img.get("original")
-
-        if not url:
-            continue
-
-        if is_png(url):
-
-            images.append({
-
-                "title": img.get("title"),
-
-                "thumbnail": img.get("thumbnail"),
-
-                "url": url,
-
-                "source": img.get("source"),
-
-                "link": img.get("link")
-
-            })
-
-        if len(images) >= count:
-            break
-
-    return images
+    return results
