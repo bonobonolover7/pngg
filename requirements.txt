@@ -1,4 +1,4 @@
 streamlit
-duckduckgo_search
+ddgs
 requests
 pillow
