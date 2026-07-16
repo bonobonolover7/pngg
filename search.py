@@ -1,38 +1,63 @@
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 
-def search_png(keyword, max_results=20):
+def search_png(keyword, max_results=30):
 
     results = []
 
     try:
+
         with DDGS() as ddgs:
 
+            query = f"{keyword} png"
+
             images = ddgs.images(
-                keywords=f"{keyword} png",
+                query,
                 max_results=max_results
             )
 
+
             for img in images:
 
-                results.append({
+                image_url = img.get("image")
 
-                    "title": img.get("title", "image"),
+                if not image_url:
+                    continue
 
-                    "image": img.get("image"),
 
-                    "thumbnail": img.get("thumbnail"),
+                results.append(
+                    {
+                        "title": img.get(
+                            "title",
+                            "PNG Image"
+                        ),
 
-                    "source": img.get("source"),
+                        "image": image_url,
 
-                    "page": img.get("url")
+                        "thumbnail": img.get(
+                            "thumbnail",
+                            image_url
+                        ),
 
-                })
+                        "source": img.get(
+                            "source",
+                            ""
+                        ),
+
+                        "page": img.get(
+                            "url",
+                            ""
+                        )
+                    }
+                )
 
 
     except Exception as e:
 
-        print("ERROR:", e)
+        print(
+            "DuckDuckGo Error:",
+            e
+        )
 
 
     return results
