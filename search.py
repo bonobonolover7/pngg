@@ -1,97 +1,144 @@
 import requests
+from urllib.parse import urlparse
+
 from duckduckgo_search import DDGS
 
 
-def check_png(url):
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+
+
+def is_png(url):
     """
-    이미지 URL이 실제 PNG인지 확인
+    PNG 여부 확인
     """
+
+    if not url:
+        return False
+
+
+    # 1차: URL 확장자 확인
+    path = urlparse(url).path.lower()
+
+    if path.endswith(".png"):
+        return True
+
+
+    # 2차: 실제 파일 타입 확인
     try:
-        response = requests.head(
+
+        r = requests.get(
             url,
-            timeout=5,
-            allow_redirects=True,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            }
+            headers=HEADERS,
+            timeout=8,
+            stream=True
         )
 
-        content_type = response.headers.get(
+
+        content_type = r.headers.get(
             "Content-Type",
             ""
         ).lower()
 
-        return "image/png" in content_type
+
+        r.close()
+
+
+        if "image/png" in content_type:
+            return True
+
 
     except Exception:
-        return False
+        pass
+
+
+    return False
+
 
 
 def search_png(keyword, max_results=30):
-    """
-    DuckDuckGo 이미지 검색 후 PNG만 반환
-    """
 
     results = []
 
-    checked_urls = set()
+    used = set()
+
+
+    # 언어 상관없이 PNG 검색 강화
+    search_words = [
+        f"{keyword} png",
+        f"{keyword} transparent png",
+        f"{keyword} filetype png"
+    ]
 
 
     try:
 
         with DDGS() as ddgs:
 
-            images = ddgs.images(
-                keywords=keyword,
-                max_results=max_results * 3
-            )
+
+            for query in search_words:
 
 
-            for img in images:
-
-                image_url = img.get("image")
-
-                if not image_url:
-                    continue
+                images = ddgs.images(
+                    keywords=query,
+                    max_results=max_results * 3
+                )
 
 
-                # 중복 제거
-                if image_url in checked_urls:
-                    continue
-
-                checked_urls.add(image_url)
+                for img in images:
 
 
-                # PNG 검사
-                if check_png(image_url):
-
-                    results.append({
-
-                        "title": img.get(
-                            "title",
-                            "No title"
-                        ),
-
-                        "image": image_url,
-
-                        "thumbnail": img.get(
-                            "thumbnail"
-                        ),
-
-                        "source": img.get(
-                            "source"
-                        ),
-
-                        "page": img.get(
-                            "url"
-                        )
-
-                    })
+                    image_url = img.get(
+                        "image"
+                    )
 
 
-                # 원하는 개수 도달
-                if len(results) >= max_results:
-                    break
+                    if not image_url:
+                        continue
+
+
+                    if image_url in used:
+                        continue
+
+
+                    used.add(image_url)
+
+
+                    if is_png(image_url):
+
+
+                        results.append({
+
+                            "title":
+                                img.get(
+                                    "title",
+                                    "PNG Image"
+                                ),
+
+                            "image":
+                                image_url,
+
+                            "thumbnail":
+                                img.get(
+                                    "thumbnail"
+                                ),
+
+                            "source":
+                                img.get(
+                                    "source"
+                                ),
+
+                            "page":
+                                img.get(
+                                    "url"
+                                )
+
+                        })
+
+
+                    if len(results) >= max_results:
+                        return results
 
 
     except Exception as e:
